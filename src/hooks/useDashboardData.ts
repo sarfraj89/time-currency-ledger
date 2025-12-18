@@ -73,9 +73,9 @@ export const useDashboardData = () => {
             .subscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            supabase.removeChannel(scheduleChannel);
         };
     }, []);
 
-    return { schedules, loading, profile, isEmpty: schedules.length === 0 };
+    return { schedules, loading, profile, completions, isEmpty: schedules.length === 0 };
 };

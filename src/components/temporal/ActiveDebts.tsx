@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Trash2, Play, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,13 +31,14 @@ interface DebtItemProps {
   onDelete: (id: string) => void;
 }
 
-const DebtItem = ({ entry, onLiquidate, onDelete }: DebtItemProps) => {
+const DebtItem = forwardRef<HTMLDivElement, DebtItemProps>(({ entry, onLiquidate, onDelete }, ref) => {
   const totalOwed = entry.duration + entry.accruedInterest;
   const interestPercent = entry.duration > 0 ? (entry.accruedInterest / entry.duration) * 100 : 0;
   const isUrgent = interestPercent > 20;
 
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
@@ -107,7 +108,9 @@ const DebtItem = ({ entry, onLiquidate, onDelete }: DebtItemProps) => {
       </div>
     </motion.div>
   );
-};
+});
+
+DebtItem.displayName = "DebtItem";
 
 interface ActiveDebtsProps {
   onLiquidate: (entry: TimeEntry) => void;
