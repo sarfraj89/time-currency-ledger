@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Percent, Clock, Trash2, AlertTriangle } from 'lucide-react';
+import { Save, Percent, Clock, Trash2, AlertTriangle, Briefcase, Palette } from 'lucide-react';
 import { TopBar } from '@/components/temporal/TopBar';
 import { TransactionDialog } from '@/components/temporal/TransactionDialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -29,19 +31,68 @@ export default function Settings() {
   const [pomodoroLength, setPomodoroLength] = useState('25');
   const [notifications, setNotifications] = useState(true);
   const [autoInterest, setAutoInterest] = useState(true);
+  
+  // New Preferences
+  const [theme, setTheme] = useState("system");
+  const [workStart, setWorkStart] = useState("09:00");
+  const [workEnd, setWorkEnd] = useState("17:00");
 
-  const handleSave = () => {
+  useEffect(() => {
+    // Load from Supabase
+    const loadProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('theme_preference, work_hours')
+          .eq('id', user.id)
+          .single();
+        
+        if (data) {
+          if (data.theme_preference) setTheme(data.theme_preference);
+          if (data.work_hours && typeof data.work_hours === 'object') {
+            const wh = data.work_hours as any;
+            if (wh.start) setWorkStart(wh.start);
+            if (wh.end) setWorkEnd(wh.end);
+          }
+        }
+      }
+    };
+    loadProfile();
+  }, []);
+
+  const handleSave = async () => {
+    // Local Save
     localStorage.setItem('temporal-settings', JSON.stringify({
       interestRate: interestRate[0],
       pomodoroLength,
       notifications,
       autoInterest,
     }));
-    
-    toast({
-      title: 'Settings saved',
-      description: 'Your preferences have been updated.',
-    });
+
+    // Supabase Save
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error } = await supabase.from('profiles').update({
+          theme_preference: theme,
+          work_hours: { start: workStart, end: workEnd }
+        }).eq('id', user.id);
+
+        if (error) throw error;
+      }
+      
+      toast({
+        title: 'Settings saved',
+        description: 'Your preferences have been updated locally and in the cloud.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error saving to cloud',
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleClearData = () => {
@@ -67,6 +118,51 @@ export default function Settings() {
               Configure your temporal finance parameters
             </p>
           </div>
+
+          {/* Personalization Settings (New) */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="h-5 w-5 text-primary" />
+                Personalization
+              </CardTitle>
+              <CardDescription>
+                Customize your dashboard appearance and schedule
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label>Theme Preference</Label>
+                <Select value={theme} onValueChange={setTheme}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select theme" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="light">Light</SelectItem>
+                    <SelectItem value="dark">Dark</SelectItem>
+                    <SelectItem value="system">System</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                 <div className="flex items-center gap-2 mb-2">
+                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                    <Label>Work Hours</Label>
+                 </div>
+                 <div className="flex gap-4">
+                    <div className="flex-1 space-y-1">
+                        <Label className="text-xs text-muted-foreground">Start</Label>
+                        <Input type="time" value={workStart} onChange={(e) => setWorkStart(e.target.value)} />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                        <Label className="text-xs text-muted-foreground">End</Label>
+                        <Input type="time" value={workEnd} onChange={(e) => setWorkEnd(e.target.value)} />
+                    </div>
+                 </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Interest Settings */}
           <Card className="glass-card">
